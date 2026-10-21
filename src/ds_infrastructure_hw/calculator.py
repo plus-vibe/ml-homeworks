@@ -1,4 +1,3 @@
-
 """Simple calculator utilities."""
 
 

@@ -1,12 +1,13 @@
+
 [project]
 name = "ds-infrastructure-hw"
 version = "0.1.0"
-description = "Add your description here"
+description = "Data Science project infrastructure homework"
 readme = "README.md"
 authors = [
     { name = "artem", email = "gulamov.art@yandex.ru" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = []
 
 [project.scripts]
@@ -15,3 +16,44 @@ ds-infrastructure-hw = "ds_infrastructure_hw:main"
 [build-system]
 requires = ["uv_build>=0.13.4,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy==1.18.2",
+    "pre-commit==4.3.0",
+    "ruff==0.14.2",
+]
+
+[tool.ruff]
+line-length = 99
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "B",
+    "UP",
+    "I",
+    "SIM",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+exclude = '(^|/)(__pycache__|\.venv|build|dist)/'
+
+[[tool.mypy.overrides]]
+module = ["third_party_untyped.*"]
+ignore_missing_imports = true
