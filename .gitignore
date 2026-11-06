@@ -55,3 +55,11 @@ Thumbs.db
 *~
 
 # uv.lock must be committed!
+
+# Keep Python data processing package in Git
+!src/ds_infrastructure_hw/data/
+!src/ds_infrastructure_hw/data/**
+
+# Python cache
+__pycache__/
+*.py[cod]
