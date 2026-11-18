@@ -79,3 +79,38 @@ data:
 	@$(MAKE) split DATA_VERSION=$(DATA_VERSION) VAL_SIZE=$(VAL_SIZE) SEED=$(SEED)
 	@$(MAKE) statistics DATA_VERSION=$(DATA_VERSION)
 	@$(MAKE) publish DATA_VERSION=$(DATA_VERSION) VAL_SIZE=$(VAL_SIZE) SEED=$(SEED) WORKERS=$(WORKERS)
+
+.PHONY: infra-up infra-down infra-status
+
+infra-up:
+	docker compose build trainer
+	docker compose up -d --build --wait rustfs postgres mlflow
+
+infra-down:
+	docker compose down
+
+infra-status:
+	docker compose ps -a
+
+.PHONY: experiment-one
+
+CONFIG ?= configs/baseline.yaml
+
+experiment-one:
+	docker compose run --rm \
+		-e GIT_COMMIT="$$(git rev-parse HEAD)" \
+		trainer \
+		python -m ds_infrastructure_hw.experiments.train \
+		--config $(CONFIG)
+
+.PHONY: experiments experiments-dry-run
+
+experiments experiments-dry-run: CONFIG = configs/grid.yaml
+
+experiments:
+	uv run python -m ds_infrastructure_hw.experiments.grid \
+		--config $(CONFIG)
+
+experiments-dry-run:
+	uv run python -m ds_infrastructure_hw.experiments.grid \
+		--config $(CONFIG) --dry-run

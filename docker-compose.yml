@@ -33,19 +33,115 @@ services:
       AWS_REQUEST_CHECKSUM_CALCULATION: when_required
       AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
       S3_BUCKET: ${S3_BUCKET:?}
+      MLFLOW_BUCKET: ${MLFLOW_BUCKET:?}
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         endpoint="http://rustfs:9000"
-        if aws --endpoint-url "$$endpoint" s3api head-bucket \
-          --bucket "$$S3_BUCKET" >/dev/null 2>&1; then
-          echo "Bucket already exists: $$S3_BUCKET"
-        else
-          aws --endpoint-url "$$endpoint" s3api create-bucket \
-            --bucket "$$S3_BUCKET"
-          echo "Bucket created: $$S3_BUCKET"
-        fi
+        for bucket in "$$S3_BUCKET" "$$MLFLOW_BUCKET"; do
+          if aws --endpoint-url "$$endpoint" s3api head-bucket \
+            --bucket "$$bucket" >/dev/null 2>&1; then
+            echo "Bucket already exists: $$bucket"
+          else
+            aws --endpoint-url "$$endpoint" s3api create-bucket \
+              --bucket "$$bucket"
+            echo "Bucket created: $$bucket"
+          fi
+        done
+    restart: "no"
+
+  postgres:
+    image: postgres:16.10
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U mlflow -d mlflow
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
+      MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow:5000,localhost:*,127.0.0.1:*"
+      MLFLOW_BUCKET: ${MLFLOW_BUCKET:?}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        exec mlflow server \
+          --host 0.0.0.0 \
+          --port 5000 \
+          --workers 2 \
+          --backend-store-uri "postgresql+psycopg2://mlflow:$${POSTGRES_PASSWORD}@postgres:5432/mlflow" \
+          --serve-artifacts \
+          --artifacts-destination "s3://$${MLFLOW_BUCKET}/"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=5)"
+      interval: 10s
+      timeout: 8s
+      retries: 18
+      start_period: 60s
+
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.train
+    profiles:
+      - training
+    depends_on:
+      rustfs:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    environment:
+      S3_ENDPOINT_URL: http://rustfs:9000
+      S3_BUCKET: ${S3_BUCKET:?}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      GIT_PYTHON_REFRESH: quiet
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
+      MPLBACKEND: Agg
+    volumes:
+      - trainer_cache:/app/data/cache
     restart: "no"
 
 volumes:
   rustfs_data:
+  postgres_data:
+  trainer_cache:
