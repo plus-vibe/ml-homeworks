@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING
 
 import boto3
 from botocore.config import Config
-from mypy_boto3_s3.client import S3Client
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
 
 
 def get_s3_client() -> S3Client:

@@ -10,9 +10,14 @@ authors = [
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "boto3>=1.43.125",
+    "matplotlib>=3.11.2",
+    "mlflow==3.16.0",
     "numpy>=2.5.4",
     "pillow>=13.0.0",
+    "pyyaml>=6.0.3",
     "requests>=2.34.2",
+    "scikit-learn>=1.9.1",
+    "torch>=2.15.0",
 ]
 
 [project.scripts]
@@ -28,6 +33,7 @@ dev = [
     "mypy==1.18.2",
     "pre-commit==4.3.0",
     "ruff==0.14.2",
+    "types-pyyaml>=6.0.12.20261113",
 ]
 
 [tool.ruff]
@@ -63,3 +69,17 @@ exclude = '(^|/)(__pycache__|\.venv|build|dist)/'
 [[tool.mypy.overrides]]
 module = ["third_party_untyped.*"]
 ignore_missing_imports = true
+
+
+# Use CPU-only PyTorch on Linux.
+# Other dependencies continue to use PyPI.
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

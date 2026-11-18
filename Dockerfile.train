@@ -1,0 +1,30 @@
+FROM ghcr.io/astral-sh/uv:0.13.4 AS uv
+
+FROM python:3.12.12-slim-bookworm
+
+COPY --from=uv /uv /uvx /usr/local/bin/
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_DEV=1 \
+    PYTHONUNBUFFERED=1 \
+    OMP_NUM_THREADS=4 \
+    MPLBACKEND=Agg
+
+WORKDIR /app
+
+# Install third-party dependencies first.
+COPY pyproject.toml uv.lock README.md ./
+
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Copy project sources after dependency installation.
+COPY src/ ./src/
+COPY configs/ ./configs/
+
+# Install the local project using the already resolved environment.
+RUN uv sync --frozen --no-dev --offline
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["python", "-m", "ds_infrastructure_hw.experiments.train", "--help"]
